@@ -1,14 +1,7 @@
 import requests
 import json
 import os
-
-CONFIG_PATH = "config/config.json"
-
-def load_config():
-    if not os.path.exists(CONFIG_PATH):
-        raise FileNotFoundError("config/config.json not found")
-    with open(CONFIG_PATH, 'r') as f:
-        return json.load(f)
+from modules.config_loader import load_config
 
 def fetch_reddit_posts(query="Google", limit=5):
     config = load_config()
