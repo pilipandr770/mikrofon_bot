@@ -11,10 +11,10 @@ def load_config():
         "telegram_token": os.getenv("TELEGRAM_TOKEN"),
         "telegram_channel_id": os.getenv("TELEGRAM_CHANNEL_ID"),
     }
-    # Если все ключи есть в окружении — используем их
-    if all(config.values()):
+    # Если хотя бы один ключ есть в окружении — используем их (остальные могут быть None)
+    if any(config.values()):
         return config
-    # Если хотя бы одного ключа не хватает — пробуем загрузить из файла
+    # Если нет переменных — пробуем загрузить из файла
     if os.path.exists(CONFIG_PATH):
         with open(CONFIG_PATH, "r", encoding="utf-8") as f:
             return json.load(f)
