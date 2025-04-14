@@ -1,3 +1,57 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.env/
+
+# Logs
+*.log
+mikrofon_bot.log
+scheduler.log
+schedule_runner.log
+logs/
+
+# Config with sensitive data
+config/config.json
+
+# State files
+last_check.json
+last_rss_id.json
+publication_queue.json
+
+# Output files
+output/
+
+# Distribution / packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swn
+.DS_Store
 # Logs
 logs
 *.log

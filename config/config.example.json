@@ -1,0 +1,7 @@
+{
+  "serpapi_key": "YOUR_SERPAPI_KEY_HERE",
+  "openai_api_key": "sk-YOUR_OPENAI_API_KEY_HERE",
+  "assistant_id": "asst_YOUR_OPENAI_ASSISTANT_ID_HERE",
+  "telegram_token": "YOUR_TELEGRAM_BOT_TOKEN_HERE",
+  "telegram_channel_id": "YOUR_TELEGRAM_CHANNEL_ID_HERE"
+}
