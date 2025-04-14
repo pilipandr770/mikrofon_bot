@@ -4,7 +4,6 @@ import json
 CONFIG_PATH = "config/config.json"
 
 def load_config():
-    # Пробуем взять из переменных окружения
     config = {
         "serpapi_key": os.getenv("SERPAPI_KEY"),
         "openai_api_key": os.getenv("OPENAI_API_KEY"),
