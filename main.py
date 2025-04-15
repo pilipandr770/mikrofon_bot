@@ -1,98 +1,74 @@
-import asyncio
+import time
+import json
 import os
-import sys
-import argparse
-import logging
+from datetime import date
 
-# Настройка логирования
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler("mikrofon_bot.log"),
-        logging.StreamHandler()
-    ]
-)
+from modules import rss_reader, planner, post_filler, translator, image_generator, publisher_main as publisher
 
-logger = logging.getLogger("MikrofonBot")
+OUTPUT_DIR = "output"
 
-# Для Windows используем правильную политику eventloop
-if sys.platform == "win32":
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+def get_plan_path(source):
+    today = date.today().isoformat()
+    return os.path.join(OUTPUT_DIR, source, f"plan_{today}.json")
 
-async def run_check():
-    """Выполняет однократную проверку RSS и обработку новых записей"""
-    from modules.scheduler import check_rss, process_next_publication
-    
-    logger.info("Начинаем проверку RSS...")
-    has_new_entries = await check_rss()
-    
-    if has_new_entries:
-        logger.info("Найдены новые записи, обрабатываем первую из них...")
-        await process_next_publication()
-    else:
-        logger.info("Новых записей не найдено")
+def save_plan(plan, path):
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(plan, f, ensure_ascii=False, indent=2)
 
-async def run_scheduler():
-    """Запускает планировщик в постоянном режиме"""
-    from modules.scheduler import run_scheduler_loop
-    
-    logger.info("Запускаем планировщик...")
-    await run_scheduler_loop()
+def main():
+    print("📥 1. Отримання новин із RSS та Reddit...")
+    # Явно загружаем свежие новости и формируем очередь публикаций
+    rss_reader.fetch_latest_entries()
+    entries_by_source = rss_reader.get_all_rss_entries()
 
-async def publish_next():
-    """Публикует следующую запись из очереди"""
-    from modules.scheduler import process_next_publication
-    
-    logger.info("Публикуем следующую запись из очереди...")
-    result = await process_next_publication()
-    
-    if result:
-        logger.info("Публикация успешно выполнена")
-    else:
-        logger.info("Не удалось опубликовать запись или очередь пуста")
+    for source, source_entries in entries_by_source.items():
+        print(f"🗂 Джерело: {source} — {len(source_entries)} новин")
+        plan_path = get_plan_path(source)
+        # Если план уже есть — загружаем, иначе создаём новый
+        if os.path.exists(plan_path):
+            with open(plan_path, "r", encoding="utf-8") as f:
+                plan = json.load(f)
+            print("📄 План вже існує, завантажено")
+        else:
+            print("🧠 Генеруємо новий план...")
+            plan_raw = planner.create_daily_plan(source_entries)
+            # Проверка структуры результата
+            if not isinstance(plan_raw, list) or not all(isinstance(post, dict) and "title" in post and "idea" in post for post in plan_raw):
+                print("❌ Помилка: create_daily_plan повернув неочікувану структуру:", plan_raw)
+                return
+            plan = {
+                "date": str(date.today()),
+                "source": source,
+                "posts": [
+                    {"title": post["title"], "idea": post["idea"], "status": "empty"}
+                    for post in plan_raw
+                ]
+            }
+            os.makedirs(os.path.dirname(plan_path), exist_ok=True)
+            save_plan(plan, plan_path)
 
-async def view_queue():
-    """Показывает текущую очередь публикаций"""
-    from modules.rss_reader import load_publication_queue
-    
-    queue = load_publication_queue()
-    
-    if not queue:
-        print("Очередь публикаций пуста")
-        return
-    
-    print(f"В очереди {len(queue)} публикаций:")
-    for i, entry in enumerate(queue):
-        print(f"{i+1}. [{entry['source']}] {entry['title']}")
-        print(f"   ID: {entry['id']}")
-        print(f"   Добавлено: {entry['timestamp']}")
-        print()
+        # Генерация текстов и промптов для всех пустых постов
+        if any(post.get("status") == "empty" for post in plan["posts"]):
+            print("✍️ 2. Генеруємо тексти та промпти...")
+            plan = post_filler.fill_plan_with_content(plan)
+            save_plan(plan, plan_path)
+
+        # Перевод всех заполненных постов
+        if any(post.get("status") == "filled" for post in plan["posts"]):
+            print("🌐 3. Перекладаємо тексти...")
+            plan = translator.translate_filled_plan(plan)
+            save_plan(plan, plan_path)
+
+        # Генерация изображений для всех постов, где есть промпт, но нет картинки
+        if any("image_prompt" in post and not post.get("image_generated") for post in plan["posts"]):
+            print("🖼 4. Генеруємо зображення...")
+            plan = image_generator.generate_images_from_plan(plan)
+            save_plan(plan, plan_path)
+
+        # Публикация всех переведённых постов
+        print("📤 5. Починаємо публікацію...")
+        publisher.publish_all_languages()
 
 if __name__ == "__main__":
-    # Создаем директории для вывода, если их нет
-    if not os.path.exists("output"):
-        os.makedirs("output")
-    
-    # Парсим аргументы командной строки
-    parser = argparse.ArgumentParser(description="MikrofonBot - RSS агрегатор с публикацией в соцсети")
-    parser.add_argument("--scheduler", action="store_true", help="Запустить в режиме планировщика")
-    parser.add_argument("--check", action="store_true", help="Выполнить проверку RSS")
-    parser.add_argument("--publish", action="store_true", help="Опубликовать следующую запись из очереди")
-    parser.add_argument("--queue", action="store_true", help="Показать текущую очередь публикаций")
-    
-    args = parser.parse_args()
-    
-    # Выбираем режим работы
-    if args.scheduler:
-        asyncio.run(run_scheduler())
-    elif args.check:
-        asyncio.run(run_check())
-    elif args.publish:
-        asyncio.run(publish_next())
-    elif args.queue:
-        asyncio.run(view_queue())
-    else:
-        # По умолчанию выполняем однократную проверку
-        print("Запускаем однократную проверку. Используйте --scheduler для постоянной работы.")
-        asyncio.run(run_check())
+    main()
+    print("✅ Завершено!")

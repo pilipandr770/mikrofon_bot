@@ -60,6 +60,30 @@ def generate_and_save_image(article_text, source_name, file_id):
     
     return image_path
 
+def generate_images_from_plan(plan):
+    """
+    Генерирует изображения для всех постов с image_prompt, если изображение ещё не создано.
+    Помечает посты как image_generated и добавляет путь к картинке.
+    """
+    for i, post in enumerate(plan["posts"]):
+        if not post.get("image_prompt") or post.get("image_generated"):
+            continue
+        print(f"🖼 Генеруємо зображення для поста {i+1}...")
+        try:
+            image_url = create_image_from_prompt(post["image_prompt"])
+            image_path = save_image_from_url(
+                image_url,
+                plan["source"],
+                str(i+1).zfill(3)
+            )
+            post["image_generated"] = True
+            post["image_path"] = image_path
+            print(f"✅ Зображення збережено: {image_path}")
+        except Exception as e:
+            print(f"❌ Помилка при генерації зображення: {e}")
+            post["image_generated"] = False
+    return plan
+
 if __name__ == "__main__":
     from modules.rss_reader import get_next_publication
     import sys

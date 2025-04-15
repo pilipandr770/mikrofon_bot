@@ -95,6 +95,13 @@ def fetch_latest_entries():
     
     return new_entries
 
+def fetch_all_news():
+    """
+    Получает свежие новости из всех источников (RSS), добавляет новые в очередь и возвращает сгруппированные по источникам.
+    """
+    fetch_latest_entries()
+    return get_all_rss_entries()
+
 def get_next_publication():
     """Получает следующую публикацию из очереди (но не удаляет ее)"""
     queue = load_publication_queue()
@@ -107,6 +114,18 @@ def remove_from_queue(entry_id):
     queue = load_publication_queue()
     queue = [entry for entry in queue if entry["id"] != entry_id]
     save_publication_queue(queue)
+
+def get_all_rss_entries():
+    """
+    Возвращает все записи из очереди публикаций, сгруппированные по источнику.
+    Пример: {"google": [...], "openai": [...]} 
+    """
+    queue = load_publication_queue()
+    grouped = {}
+    for entry in queue:
+        source = entry.get("source", "unknown")
+        grouped.setdefault(source, []).append(entry)
+    return grouped
 
 if __name__ == "__main__":
     new_entries = fetch_latest_entries()
