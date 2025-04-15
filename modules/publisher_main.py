@@ -8,6 +8,8 @@ from modules.publisher import telegram  # інші платформи згодо
 PLAN_DIR = "output"
 SUPPORTED_LANGS = ["uk", "en", "de"]
 
+# 🛠 Автоматично створюємо output/, якщо його немає
+os.makedirs(PLAN_DIR, exist_ok=True)
 
 def get_today_plan():
     today_str = datetime.today().strftime("%Y-%m-%d")
@@ -20,7 +22,6 @@ def get_today_plan():
                     plan = json.load(f)
                 return plan, plan_path
     return None, None
-
 
 def publish_all_languages():
     plan, path = get_today_plan()
@@ -51,10 +52,9 @@ def publish_all_languages():
                 with open(path, "w", encoding="utf-8") as f:
                     json.dump(plan, f, ensure_ascii=False, indent=2)
                 print(f"✅ Опубліковано пост {i+1} ({lang})")
-                time.sleep(2)  # необов'язково, але краще уникати спаму API
+                time.sleep(2)
             else:
                 print(f"❌ Не вдалося опублікувати пост {i+1} ({lang})")
-
 
 def publish_next_set():
     plan, path = get_today_plan()
@@ -62,13 +62,12 @@ def publish_next_set():
         print("❌ План не знайдено на сьогодні")
         return
 
-    # Найти первый пост, который не опубликован ни на одном языке
     for i, post in enumerate(plan["posts"]):
         if post.get("status") != "translated":
             continue
         if all(post.get(f"status_{lang}") == "published" for lang in SUPPORTED_LANGS):
             continue
-        # Публикуем этот пост на всех языках
+
         for lang in SUPPORTED_LANGS:
             if post.get(f"status_{lang}") == "published":
                 continue
@@ -84,21 +83,16 @@ def publish_next_set():
                 with open(path, "w", encoding="utf-8") as f:
                     json.dump(plan, f, ensure_ascii=False, indent=2)
                 print(f"✅ Опубліковано пост {i+1} ({lang})")
-                # Не делаем time.sleep, чтобы все языки ушли одновременно
             else:
                 print(f"❌ Не вдалося опублікувати пост {i+1} ({lang})")
-        # После публикации одного поста на все языки — выходим
         break
     else:
         print("✅ Всі пости на сьогодні вже опубліковані!")
 
-
 if __name__ == "__main__":
     import schedule
-    import time
     print("⏳ Publisher запущено. Публікація кожні 2 години...")
     schedule.every(2).hours.do(publish_next_set)
-    # При запуске сразу публикуем первую порцию
     publish_next_set()
     while True:
         schedule.run_pending()
